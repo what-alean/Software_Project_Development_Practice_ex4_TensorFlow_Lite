@@ -45,6 +45,8 @@ import org.tensorflow.lite.examples.classification.util.YuvToRgbConverter
 import org.tensorflow.lite.examples.classification.viewmodel.Recognition
 import org.tensorflow.lite.examples.classification.viewmodel.RecognitionListViewModel
 import org.tensorflow.lite.support.image.TensorImage
+import org.tensorflow.lite.support.model.Model
+import org.tensorflow.lite.gpu.CompatibilityList
 import java.util.concurrent.Executors
 
 // Constants
@@ -180,7 +182,23 @@ class MainActivity : AppCompatActivity() {
     private class ImageAnalyzer(ctx: Context, private val listener: RecognitionListener) :
         ImageAnalysis.Analyzer {
 
-        private val flowerModel = FlowerModel.newInstance(ctx)
+        // TODO 1: Add class variable TensorFlow Lite Model
+        private val flowerModel: FlowerModel by lazy {
+
+            // TODO 6. Optional GPU acceleration
+            val compatList = CompatibilityList()
+
+            val options = if (compatList.isDelegateSupportedOnThisDevice) {
+                Log.d(TAG, "This device is GPU Compatible ")
+                Model.Options.Builder().setDevice(Model.Device.GPU).build()
+            } else {
+                Log.d(TAG, "This device is GPU Incompatible ")
+                Model.Options.Builder().setNumThreads(4).build()
+            }
+
+            // Initialize the Flower Model
+            FlowerModel.newInstance(ctx, options)
+        }
 
         override fun analyze(imageProxy: ImageProxy) {
 
@@ -194,13 +212,13 @@ class MainActivity : AppCompatActivity() {
             }
             val tfImage = TensorImage.fromBitmap(bitmap)
 
-            // Process the image using the trained model, sort and pick out the top
+            // TODO 3: Process the image using the trained model, sort and pick out the top results
             val outputs = flowerModel.process(tfImage)
-                .probabilityAsCategoryList
-                .sortedByDescending { it.score } // 修复此处：使用 sortedByDescending
-                .take(MAX_RESULT_DISPLAY)
+                .probabilityAsCategoryList.apply {
+                    sortByDescending { it.score } // Sort with highest confidence first
+                }.take(MAX_RESULT_DISPLAY) // take the top results
 
-            // Converting the top probability items into a list of recognitions
+            // TODO 4: Converting the top probability items into a list of recognitions
             for (output in outputs) {
                 items.add(Recognition(output.label, output.score))
             }
